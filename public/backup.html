@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MongoDB Security Demo</title>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 13px;
+            background-color: #f8f9fa;
+            line-height: 1.4;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: auto 1fr auto;
+            gap: 8px;
+            height: 100vh;
+            padding: 8px;
+        }
+
+        .user-controls {
+            grid-column: 1 / -1;
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border: 1px solid #e1e5e9;
+        }
+
+        .panel {
+            background: white;
+            padding: 12px;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            border: 1px solid #e1e5e9;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .view-editor {
+            grid-column: 1 / -1;
+            display: none;
+        }
+
+        .panel-content {
+            flex: 1;
+            overflow-y: auto;
+            margin-top: 8px;
+        }
+
+        h2 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+
+        h3 {
+            font-size: 13px;
+            font-weight: 600;
+            color: #2c3e50;
+            margin: 12px 0 6px 0;
+        }
+
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 6px;
+            margin-bottom: 4px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        button:hover {
+            background: #2980b9;
+        }
+
+        button.active {
+            background: #27ae60;
+        }
+
+        button.test {
+            background: #f39c12;
+        }
+
+        button.test:hover {
+            background: #e67e22;
+        }
+
+        button.small {
+            padding: 4px 8px;
+            font-size: 11px;
+        }
+
+        .error {
+            color: #e74c3c;
+            background: #fdf2f2;
+            padding: 8px;
+            border-radius: 4px;
+            margin: 6px 0;
+            font-size: 12px;
+            border-left: 3px solid #e74c3c;
+        }
+
+        .success {
+            color: #27ae60;
+            background: #f0fff0;
+            padding: 8px;
+            border-radius: 4px;
+            margin: 6px 0;
+            font-size: 12px;
+            border-left: 3px solid #27ae60;
+        }
+
+        .info-badge {
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 3px;
+            margin: 4px 0;
+            font-weight: 500;
+        }
+
+        .current-user {
+            background: #e8f5e8;
+            border-left: 3px solid #27ae60;
+        }
+
+        .admin-access {
+            background: #fff3cd;
+            border-left: 3px solid #ffc107;
+        }
+
+        .user-access {
+            background: #d1ecf1;
+            border-left: 3px solid #17a2b8;
+        }
+
+        .code-editor, .query-input {
+            width: 100%;
+            font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace;
+            font-size: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 8px;
+            background: #f8f9fa;
+            resize: vertical;
+        }
+
+        .code-editor {
+            height: 120px;
+            min-height: 80px;
+        }
+
+        .query-input {
+            height: 60px;
+            min-height: 40px;
+        }
+
+        pre {
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            font-size: 11px;
+            font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', monospace;
+            border: 1px solid #e9ecef;
+            margin: 4px 0;
+        }
+
+        .pipeline-examples {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 8px 0;
+        }
+
+        .example-button {
+            background: #6c757d;
+            font-size: 11px;
+            padding: 4px 8px;
+            margin: 0;
+        }
+
+        .example-button:hover {
+            background: #5a6268;
+        }
+
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+
+        .query-section {
+            border-top: 1px solid #e9ecef;
+            padding-top: 8px;
+            margin-top: 8px;
+        }
+
+        .query-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .query-label {
+            font-weight: 600;
+            font-size: 12px;
+            color: #495057;
+            min-width: 60px;
+        }
+
+        .flex-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+
+        .flex-grow {
+            flex: 1;
+        }
+
+        small {
+            font-size: 11px;
+            color: #6c757d;
+        }
+
+        .compact-section {
+            border-top: 1px solid #e9ecef;
+            margin-top: 8px;
+            padding-top: 8px;
+        }
+
+        .results-count {
+            font-size: 11px;
+            color: #6c757d;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <div class="container">
+        <!-- User Controls -->
+        <div class="user-controls">
+            <div class="flex-row">
+                <div class="flex-grow">
+
+                    <div class="info-badge current-user">
+                        <strong>{{ currentUser.username }}</strong> - {{ currentUser.description }}
+                    </div>
+                </div>
+                <div class="button-group">
+                    <button
+                            v-for="user in availableUsers"
+                            :key="user.username"
+                            @click="switchUser(user.username)"
+                            :class="{ active: user.username === currentUser.username }"
+                            class="small"
+                    >
+                        {{ user.username }}
+                    </button>
+                    <button @click="loadUsers" class="small">Users Info</button>
+                </div>
+            </div>
+
+            <div v-if="userInfo" class="compact-section">
+                <h3>MongoDB User Information:</h3>
+                <pre>{{ JSON.stringify(userInfo, null, 2) }}</pre>
+            </div>
+        </div>
+
+        <!-- Collection Data -->
+        <div class="panel">
+            <div>
+
+                <div class="info-badge admin-access">
+                    Collection Data:
+                    🔒 Admin Access - secdemo.data
+                    <button @click="loadData" class="small">Refresh</button>
+                </div>
+
+                <div v-if="collectionData" class="results-count">
+                    {{ collectionData.documents ? collectionData.documents.length : 0 }} documents
+                </div>
+            </div>
+
+            <div class="panel-content">
+                <div v-if="error" class="error">{{ error }}</div>
+                <pre v-if="collectionData">{{ JSON.stringify(collectionData.documents, null, 2) }}</pre>
+            </div>
+        </div>
+
+        <!-- View Results -->
+        <div class="panel">
+            <div>
+
+                <div class="info-badge user-access">
+                    View Results:
+                    👤 {{ currentUser.username }} Access - secdemo.secview
+                    <button @click="loadViewResults" class="small">Refresh</button>
+                </div>
+
+                <div v-if="viewResults" class="results-count">
+                    {{ viewResults.results ? viewResults.results.length : 0 }} documents
+                </div>
+            </div>
+
+            <div class="query-section">
+                <div class="query-controls">
+                    <span class="query-label">Query:</span>
+                    <button @click="executeViewQuery" class="small">Execute</button>
+                    <button @click="clearQuery" class="small">Clear</button>
+                </div>
+                <textarea
+                        v-model="viewQuery"
+                        class="query-input"
+                        placeholder='{ "classification": "confidential" }'
+                ></textarea>
+            </div>
+
+            <div class="panel-content">
+                <div v-if="viewError" class="error">{{ viewError }}</div>
+                <pre v-if="viewResults">{{ JSON.stringify(viewResults.results, null, 2) }}</pre>
+            </div>
+        </div>
+
+        <!-- Pipeline Editor -->
+        <div class="panel">
+            <div>
+
+                <div class="info-badge admin-access">
+                    Pipeline Editor: 🔧 Admin Only - JavaScript
+                </div>
+                <div class="button-group">
+                    <button @click="testPipeline" class="test small">Test</button>
+                    <button @click="updateView" class="small">Update View</button>
+                    <button @click="loadViewDefinition" class="small">Load Current</button>
+                </div>
+            </div>
+
+            <div class="panel-content">
+                <div v-if="testResult && testResult.success" class="success">
+                    ✅ {{ testResult.message }}
+                </div>
+                <div v-if="testResult && !testResult.success" class="error">
+                    ❌ {{ testResult.error }}
+                </div>
+
+                <textarea v-model="pipelineCode" class="code-editor"
+                          placeholder="pipeline = [{ $match: { classification: 'confidential' } }];"></textarea>
+
+                <div class="pipeline-examples">
+                    <button class="example-button" @click="setPipelineExample('confidential')">Confidential</button>
+                    <button class="example-button" @click="setPipelineExample('secret')">Secret</button>
+                    <button class="example-button" @click="setPipelineExample('both')">Both</button>
+                    <button class="example-button" @click="setPipelineExample('projection')">Project</button>
+                    <button class="example-button" @click="setPipelineExample('read_in')">Read In</button>
+                    <button class="example-button" @click="setPipelineExample('dynamic')">Dynamic</button>
+                </div>
+
+                <div v-if="currentViewDef" class="compact-section">
+                    <h3>Current Definition:</h3>
+                    <pre>{{ JSON.stringify(currentViewDef, null, 2) }}</pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- View Definition Display -->
+        <div  class="panel view-editor">
+            <div>
+                <h2>View Definition & Test Results</h2>
+                <div class="info-badge admin-access">
+                    📋 Current secdemo.secview configuration
+                </div>
+            </div>
+
+            <div class="panel-content">
+                <div v-if="viewDefError" class="error">{{ viewDefError }}</div>
+
+                <div v-if="testResult && testResult.success">
+                    <h3>Tested Pipeline:</h3>
+                    <pre>{{ JSON.stringify(testResult.pipeline, null, 2) }}</pre>
+                </div>
+
+                <div v-if="currentViewDef && currentViewDef.options" class="compact-section">
+                    <h3>Active View Pipeline:</h3>
+                    <pre>{{ JSON.stringify(currentViewDef.options.pipeline, null, 2) }}</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const { createApp } = Vue;
+
+    createApp({
+        data() {
+            return {
+                currentUser: { username: 'alice', description: '' },
+                availableUsers: [],
+                collectionData: null,
+                viewResults: null,
+                viewQuery: '{}',
+                pipelineCode: `pipeline = [
+  { $match: { classification: 'confidential' } }
+];`,
+                currentViewDef: null,
+                userInfo: null,
+                testResult: null,
+                error: null,
+                viewError: null,
+                viewDefError: null
+            }
+        },
+        async mounted() {
+            await this.getCurrentUser();
+            await this.loadAvailableUsers();
+            await this.loadData();
+            await this.loadViewResults();
+        },
+        methods: {
+            async getCurrentUser() {
+                try {
+                    const response = await fetch('/api/current-user');
+                    const data = await response.json();
+                    this.currentUser = data;
+                } catch (err) {
+                    this.error = err.message;
+                }
+            },
+
+            async loadAvailableUsers() {
+                try {
+                    const response = await fetch('/api/available-users');
+                    this.availableUsers = await response.json();
+                } catch (err) {
+                    this.error = err.message;
+                }
+            },
+
+            async switchUser(username) {
+                try {
+                    const response = await fetch('/api/switch-user', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username })
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                        this.currentUser = {
+                            username: data.username,
+                            description: data.description
+                        };
+                        this.error = null;
+                        this.viewError = null;
+                        await this.loadViewResults();
+                    }
+                } catch (err) {
+                    this.error = err.message;
+                }
+            },
+
+            async loadUsers() {
+                try {
+                    const response = await fetch('/api/users');
+                    this.userInfo = await response.json();
+                } catch (err) {
+                    this.error = err.message;
+                }
+            },
+
+            async loadData() {
+                try {
+                    this.error = null;
+                    const response = await fetch('/api/data');
+                    if (response.ok) {
+                        this.collectionData = await response.json();
+                    } else {
+                        const errorData = await response.json();
+                        this.error = errorData.error;
+                    }
+                } catch (err) {
+                    this.error = err.message;
+                }
+            },
+
+            async loadViewResults() {
+                try {
+                    this.viewError = null;
+                    const url = '/api/view-results';
+                    const response = await fetch(url);
+                    if (response.ok) {
+                        this.viewResults = await response.json();
+                    } else {
+                        const errorData = await response.json();
+                        this.viewError = errorData.error;
+                    }
+                } catch (err) {
+                    this.viewError = err.message;
+                }
+            },
+
+            async executeViewQuery() {
+                try {
+                    this.viewError = null;
+                    const query = JSON.parse(this.viewQuery);
+                    const queryString = encodeURIComponent(JSON.stringify(query));
+                    const response = await fetch(`/api/view-results?query=${queryString}`);
+                    if (response.ok) {
+                        this.viewResults = await response.json();
+                    } else {
+                        const errorData = await response.json();
+                        this.viewError = errorData.error;
+                    }
+                } catch (err) {
+                    this.viewError = `Query error: ${err.message}`;
+                }
+            },
+
+            clearQuery() {
+                this.viewQuery = '{}';
+                this.loadViewResults();
+            },
+
+            async loadViewDefinition() {
+                try {
+                    this.viewDefError = null;
+                    const response = await fetch('/api/view-definition');
+                    if (response.ok) {
+                        this.currentViewDef = await response.json();
+                    } else {
+                        const errorData = await response.json();
+                        this.viewDefError = errorData.error;
+                    }
+                } catch (err) {
+                    this.viewDefError = err.message;
+                }
+            },
+
+            async testPipeline() {
+                try {
+                    this.testResult = null;
+                    const response = await fetch('/api/test-pipeline', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ jsCode: this.pipelineCode })
+                    });
+
+                    this.testResult = await response.json();
+                } catch (err) {
+                    this.testResult = { success: false, error: err.message };
+                }
+            },
+
+            async updateView() {
+                try {
+                    this.viewDefError = null;
+                    const response = await fetch('/api/view-definition', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ jsCode: this.pipelineCode })
+                    });
+
+                    if (response.ok) {
+                        const result = await response.json();
+                        this.testResult = { success: true, message: result.message, pipeline: result.pipeline };
+                        await this.loadViewDefinition();
+                        await this.loadViewResults();
+                    } else {
+                        const errorData = await response.json();
+                        this.viewDefError = errorData.error;
+                    }
+                } catch (err) {
+                    this.viewDefError = err.message;
+                }
+            },
+
+            setPipelineExample(type) {
+                const examples = {
+                    confidential: `pipeline = [
+  { $match: { classification: 'confidential' } }
+];`,
+
+                    secret: `pipeline = [
+  { $match: { classification: 'secret' } }
+];`,
+
+                    both: `pipeline = [
+  { $match: {
+    classification: { $in: ['confidential', 'secret'] }
+  } }
+];`,
+
+                    projection: `pipeline = [
+  { $match: { classification: 'confidential' } },
+  { $project: { name: 1, classification: 1, _id: 0 } }
+];`,
+
+                    read_in: `pipeline = [
+  { $match: { $expr : { $or: [
+       {$eq: [null,{$toString:"$op"}]},
+       {$in: [ "$op", "$$USER_ROLES.role"] }
+]}}},
+{ $project: { source:0}}
+]`,
+
+                    dynamic: `let isSecret = {$eq:["$classification","secret"] };
+
+pipeline = [
+  { $set: { source:
+    { "$cond" : { if: isSecret,
+                  then: "",
+                  else: "$source" }}
+} }
+];`
+                };
+
+                this.pipelineCode = examples[type] || examples.confidential;
+                this.testResult = null;
+            }
+
+
+
+        }
+    }).mount('#app');
+</script>
+</body>
+</html>

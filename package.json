@@ -1,0 +1,18 @@
+{
+  "name": "mongodb-security-demo",
+  "version": "1.0.0",
+  "description": "MongoDB Security Demo with User Authentication and Views",
+  "main": "server.js",
+  "scripts": {
+    "setup": "npm install --no-audit --no-fund && node scripts/setup.js",
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "mongodb": "^6.0.0"
+  },
+  "overrides": {
+    "qs": "^6.16.1"
+  }
+}

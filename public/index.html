@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MongoDB Security Demo</title>
+
+    <!-- Add Prism.js for syntax highlighting -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+
+    <!-- Link to external CSS file -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app">
+    <div class="container">
+        <!-- User Controls -->
+        <div class="user-controls">
+            <div class="flex-row">
+                <div class="flex-grow">
+
+                    <div class="info-badge current-user">
+                        <strong>{{ currentUser.username }}</strong> - {{ currentUser.description }}
+                    </div>
+                </div>
+                <div class="button-group">
+                    <button
+                            v-for="user in availableUsers"
+                            :key="user.username"
+                            @click="switchUser(user.username)"
+                            :class="{ active: user.username === currentUser.username }"
+                            class="small"
+                    >
+                        {{ user.username }}
+                    </button>
+                    <button @click="loadUsers" class="small">Users Info</button>
+                </div>
+            </div>
+
+            <div v-if="userInfo" class="compact-section">
+                <h3>MongoDB User Information:</h3>
+                <pre><code class="language-json">{{ JSON.stringify(userInfo, null, 2) }}</code></pre>
+            </div>
+        </div>
+
+        <!-- Collection Data -->
+        <div class="panel">
+            <div>
+
+                <div class="info-badge admin-access">
+                    Collection Data:
+                    🔒 Admin Access - secdemo.data
+                    <button @click="loadData" class="small">Refresh</button>
+                </div>
+
+                <div v-if="collectionData" class="results-count">
+                    {{ collectionData.documents ? collectionData.documents.length : 0 }} documents
+                </div>
+            </div>
+
+            <div class="panel-content">
+                <div v-if="error" class="error">{{ error }}</div>
+                <pre v-if="collectionData"><code class="language-json">{{ JSON.stringify(collectionData.documents, null, 2) }}</code></pre>
+            </div>
+        </div>
+
+        <!-- View Results -->
+        <div class="panel">
+            <div>
+
+                <div class="info-badge user-access">
+                    View Results:
+                    👤 {{ currentUser.username }} Access - secdemo.secview
+                    <button @click="loadViewResults" class="small">Refresh</button>
+                </div>
+
+                <div v-if="viewResults" class="results-count">
+                    {{ viewResults.results ? viewResults.results.length : 0 }} documents
+                </div>
+            </div>
+
+            <div class="query-section">
+                <div class="query-controls">
+                    <span class="query-label">Query:</span>
+                    <button @click="executeViewQuery" class="small">Execute</button>
+                    <button @click="clearQuery" class="small">Clear</button>
+                </div>
+                <textarea
+                        v-model="viewQuery"
+                        class="query-input"
+                        placeholder='{ "classification": "confidential" }'
+                ></textarea>
+            </div>
+
+            <div class="panel-content">
+                <div v-if="viewError" class="error">{{ viewError }}</div>
+                <pre v-if="viewResults"><code class="language-json">{{ JSON.stringify(viewResults.results, null, 2) }}</code></pre>
+            </div>
+        </div>
+
+        <!-- Pipeline Editor -->
+        <div class="panel">
+            <div>
+
+                <div class="info-badge admin-access">
+                    Pipeline Editor: 🔧 Admin Only - JavaScript
+                </div>
+                <div class="button-group">
+                    <button @click="testPipeline" class="test small">Test</button>
+                    <button @click="updateView" class="small">Update View</button>
+                    <button @click="loadViewDefinition" class="small">Load Current</button>
+                </div>
+            </div>
+
+            <div class="panel-content">
+                <div v-if="testResult && testResult.success" class="success">
+                    ✅ {{ testResult.message }}
+                </div>
+                <div v-if="testResult && !testResult.success" class="error">
+                    ❌ {{ testResult.error }}
+                </div>
+
+                <textarea v-model="pipelineCode" class="code-editor"
+                          placeholder="pipeline = [{ $match: { classification: 'confidential' } }];"></textarea>
+
+                <div class="pipeline-examples">
+                    <button
+                            v-for="(example, key) in pipelineExamples"
+                            :key="key"
+                            class="example-button"
+                            @click="setPipelineExample(key)"
+                            :title="example.description || ''"
+                    >
+                        {{ example.label || key }}
+                    </button>
+                </div>
+
+                <div v-if="currentViewDef" class="compact-section">
+                    <h3>Current Definition:</h3>
+                    <pre><code class="language-json">{{ JSON.stringify(currentViewDef, null, 2) }}</code></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- View Definition Display -->
+        <div  class="panel view-editor">
+            <div>
+                <h2>View Definition & Test Results</h2>
+                <div class="info-badge admin-access">
+                    📋 Current secdemo.secview configuration
+                </div>
+            </div>
+
+            <div class="panel-content">
+                <div v-if="viewDefError" class="error">{{ viewDefError }}</div>
+
+                <div v-if="testResult && testResult.success">
+                    <h3>Tested Pipeline:</h3>
+                    <pre><code class="language-json">{{ JSON.stringify(testResult.pipeline, null, 2) }}</code></pre>
+                </div>
+
+                <div v-if="currentViewDef && currentViewDef.options" class="compact-section">
+                    <h3>Active View Pipeline:</h3>
+                    <pre><code class="language-json">{{ JSON.stringify(currentViewDef.options.pipeline, null, 2) }}</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Link to external JavaScript files -->
+<script src="pipeline-examples.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
